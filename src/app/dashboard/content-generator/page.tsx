@@ -273,7 +273,7 @@ export default function ContentGenerator() {
                                 type="error"
                                 icon="⚠️"
                                 title="Generation Failed"
-                                description={error}
+                                description={error instanceof Error ? error.message : String(error)}
                                 action={{ label: "Try Again", onClick: () => setError(null) }}
                             />
                         </div>
