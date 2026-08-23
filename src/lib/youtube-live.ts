@@ -1,5 +1,5 @@
 import { normalizeInputText } from "@/lib/utils";
-import { withCache } from "@/lib/cache";
+import { withPersistentCache } from "@/lib/db-cache";
 
 type TimeRange = "7d" | "30d" | "90d" | "1y";
 
@@ -65,14 +65,18 @@ export async function youtubeGet<T>(path: string, params: Record<string, string>
     const qs = new URLSearchParams({ ...params, key: apiKey }).toString();
     const url = `https://www.googleapis.com/youtube/v3/${path}?${qs}`;
     
-    return withCache(`yt_${path}_${qs}`, async () => {
+    // We cache YouTube API calls for 6 hours (6 * 60 * 60 * 1000 ms)
+    // using our persistent file-backed database to survive serverless restarts!
+    const result = await withPersistentCache(`yt_${path}_${qs}`, async () => {
         const res = await fetch(url, { cache: "no-store" });
         if (!res.ok) {
             const text = await res.text();
             throw new Error(`YouTube API request failed (${res.status}): ${text}`);
         }
         return (await res.json()) as T;
-    });
+    }, 6 * 60 * 60 * 1000);
+    
+    return result.data;
 }
 
 /**

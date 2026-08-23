@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { youtubeGet } from "@/lib/youtube-live";
 import { normalizeInputText } from "@/lib/utils";
 import { generateHashtagIntelligence, VideoMetadataForNLP } from "@/lib/nlp";
+import { getLocalHashtags } from "@/lib/local-niches";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,34 @@ export async function GET(req: Request) {
 
         if (!topic) {
             return NextResponse.json({ message: "Topic parameter is required" }, { status: 400 });
+        }
+
+        // 🚀 FEATURE: "Local First" Generation Fallback
+        // Check if we have pre-generated optimal tags for this niche
+        const localTags = getLocalHashtags(topic);
+        if (localTags) {
+            console.log(`[Hashtags] ⚡ Local Match Found for "${topic}"! Bypassing API.`);
+            return NextResponse.json({
+                primaryKeyword: topic,
+                categories: [
+                    {
+                        name: "Highly Relevant",
+                        score: 95,
+                        tags: localTags.slice(0, 5)
+                    },
+                    {
+                        name: "Secondary",
+                        score: 80,
+                        tags: localTags.slice(5)
+                    }
+                ],
+                recommendedStrategy: "Mix 3-4 highly relevant tags with 2 secondary broad tags."
+            }, {
+                status: 200,
+                headers: {
+                    "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+                },
+            });
         }
 
         // 1. Search for top ranking videos for this topic
